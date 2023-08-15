@@ -1,3 +1,16 @@
+# Import the `pdfjs-dist` library for parsing PDFs
+pdfjs = require('pdfjs-dist')
+
+# Function to check if a PDF is encrypted
+isPdfEncrypted = (pdfData, callback) ->
+  pdfjs.getDocument(pdfData)
+    .then (pdfDocument) ->
+      isEncrypted = pdfDocument.numPages <= 0
+      callback(isEncrypted)
+    .catch (error) ->
+      console.error("Error parsing PDF:", error)
+      callback(true)
+
 angular.module('doubtfire.common.file-uploader', ["ngFileUpload"])
 
 .directive 'fileUploader', ->
@@ -237,9 +250,18 @@ angular.module('doubtfire.common.file-uploader', ["ngFileUpload"])
 
       xhr   = new XMLHttpRequest()
       form  = new FormData()
+
       # Append data
       files = ({ name: zone.name; data: zone.model[0] } for zone in $scope.uploadZones)
-      form.append file.name, file.data for file in files
+      # Check if the file is an encrypted PDF
+      isPdfEncrypted(files[0].data, (isEncrypted) ->
+        if isEncrypted
+          $scope.onFailure?({ error: 'Encrypted PDFs are not allowed' })
+          $scope.$apply()
+        else
+          form = new FormData()
+          form.append file.name, file.data for file in files
+      )
       # Append payload
       payload = ({ key: k; value: v } for k, v of $scope.payload)
       for payloadItem in payload
